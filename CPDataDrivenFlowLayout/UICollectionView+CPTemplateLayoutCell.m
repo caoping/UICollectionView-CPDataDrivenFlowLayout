@@ -136,7 +136,7 @@
             case CPPreferredLayoutDimensionWidth:
             {
                 if (fittingSize.width != preferredLayoutValue) {
-                    //iPhone 6 Plus在系统设置放大模式下，此处会计算错误
+                    //in iPhone 6 Plus display zoom mode, size must be scaling
                     fittingSize.height = preferredLayoutValue/(fittingSize.width/fittingSize.height);
                     fittingSize.width = preferredLayoutValue;
                 }
@@ -145,7 +145,7 @@
             case CPPreferredLayoutDimensionHeight:
             {
                 if (fittingSize.height != preferredLayoutValue) {
-                    //iPhone 6 Plus在系统设置放大模式下，此处会计算错误
+                    //in iPhone 6 Plus display zoom mode, size must be scaling
                     fittingSize.width = preferredLayoutValue/(fittingSize.height/fittingSize.width);
                     fittingSize.height = preferredLayoutValue;
                 }
@@ -212,7 +212,7 @@
             case CPPreferredLayoutDimensionWidth:
             {
                 if (fittingSize.width != preferredLayoutValue) {
-                    //iPhone 6 Plus在系统设置放大模式下，此处会计算错误
+                    //in iPhone 6 Plus display zoom mode, size must be scaling
                     fittingSize.height = preferredLayoutValue/(fittingSize.width/fittingSize.height);
                     fittingSize.width = preferredLayoutValue;
                 }
@@ -221,7 +221,7 @@
             case CPPreferredLayoutDimensionHeight:
             {
                 if (fittingSize.height != preferredLayoutValue) {
-                    //iPhone 6 Plus在系统设置放大模式下，此处会计算错误
+                    //in iPhone 6 Plus display zoom mode, size must be scaling
                     fittingSize.width = preferredLayoutValue/(fittingSize.height/fittingSize.width);
                     fittingSize.height = preferredLayoutValue;
                 }
