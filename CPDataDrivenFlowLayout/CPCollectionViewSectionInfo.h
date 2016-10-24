@@ -34,6 +34,11 @@ typedef CGSize (^CPCollectionViewSizeForHeaderOrFooterBlock)(__kindof UICollecti
 @property (nonatomic, readonly) NSInteger numberOfItems;
 @property (nonatomic, readonly) NSArray<CPCollectionViewCellInfo *> *cellInfos;
 
+@property (nonatomic, copy, nullable) NSString *identifier;//string used to identify section info
+@property (nonatomic) CGFloat minimumLineSpacing;//The default value of this property is 0
+@property (nonatomic) CGFloat minimumInteritemSpacing;//The default value of this property is 0
+@property (nonatomic) UIEdgeInsets sectionInset;//The default edge insets are all set to 0.
+
 @property (nonatomic, nullable) Class headerClass;
 @property (nonatomic, nullable) UINib *nibForHeader;
 @property (nonatomic, nullable) NSString *headerReuseIdentifier;

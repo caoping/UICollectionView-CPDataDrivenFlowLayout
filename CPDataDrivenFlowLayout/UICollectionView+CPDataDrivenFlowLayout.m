@@ -60,6 +60,21 @@
     return [_target respondsToSelector:aSelector] ? _target : nil;
 }
 
+- (NSMethodSignature *)methodSignatureForSelector:(SEL)sel {
+    if ([_target isKindOfClass:[NSObject class]]) {
+        return [(NSObject *)_target methodSignatureForSelector:sel];
+    }
+    
+    return nil;
+}
+
+- (void)forwardInvocation:(NSInvocation *)invocation {
+    if (_target) {
+        [invocation setTarget:_target];
+        [invocation invoke];
+    }
+}
+
 @end
 
 static NSString *_CPPlaceholderSupplementaryView = @"_CPPlaceholderSupplementaryView";
@@ -405,11 +420,36 @@ static NSString *_CPPlaceholderSupplementaryView = @"_CPPlaceholderSupplementary
 
 #pragma mark - UICollectionViewDelegateFlowLayout
 
+- (UIEdgeInsets)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout*)collectionViewLayout insetForSectionAtIndex:(NSInteger)section {
+    CPCollectionViewSectionInfo *sectionInfo = [self cp_sectionInfoForSection:section];
+    if (sectionInfo) {
+        return sectionInfo.sectionInset;
+    } else if ([collectionViewLayout isKindOfClass:[UICollectionViewFlowLayout class]]) {
+        return [(UICollectionViewFlowLayout *)collectionViewLayout sectionInset];
+    }
+    
+    return UIEdgeInsetsZero;
+}
+
 - (CGFloat)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)collectionViewLayout minimumLineSpacingForSectionAtIndex:(NSInteger)section {
+    CPCollectionViewSectionInfo *sectionInfo = [self cp_sectionInfoForSection:section];
+    if (sectionInfo) {
+        return sectionInfo.minimumLineSpacing;
+    } else if ([collectionViewLayout isKindOfClass:[UICollectionViewFlowLayout class]]) {
+        return [(UICollectionViewFlowLayout *)collectionViewLayout minimumLineSpacing];
+    }
+    
     return 0;
 }
 
 - (CGFloat)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)collectionViewLayout minimumInteritemSpacingForSectionAtIndex:(NSInteger)section {
+    CPCollectionViewSectionInfo *sectionInfo = [self cp_sectionInfoForSection:section];
+    if (sectionInfo) {
+        return sectionInfo.minimumInteritemSpacing;
+    } else if ([collectionViewLayout isKindOfClass:[UICollectionViewFlowLayout class]]) {
+        return [(UICollectionViewFlowLayout *)collectionViewLayout minimumInteritemSpacing];
+    }
+    
     return 0;
 }
 

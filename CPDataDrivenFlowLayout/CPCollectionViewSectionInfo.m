@@ -31,6 +31,7 @@
     if (self) {
         NSParameterAssert(cellInfos);
         _cellInfos = [cellInfos copy];
+        _sectionInset = UIEdgeInsetsZero;
     }
     
     return self;
@@ -38,6 +39,7 @@
 
 - (instancetype)init {
     self = [self initWithCellInfos:@[]];
+    _sectionInset = UIEdgeInsetsZero;
     
     return self;
 }
