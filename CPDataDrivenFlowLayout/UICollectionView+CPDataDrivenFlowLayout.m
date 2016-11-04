@@ -621,6 +621,33 @@ static NSString *_CPPlaceholderSupplementaryView = @"_CPPlaceholderSupplementary
     return nil;
 }
 
+- (nullable NSIndexPath *)cp_indexPathForCellInfo:(CPCollectionViewCellInfo *)cellInfo {
+    __block NSIndexPath *indexPath;
+    [[self cp_sectionInfos] enumerateObjectsUsingBlock:^(CPCollectionViewSectionInfo * _Nonnull section, NSUInteger sectionIndex, BOOL * _Nonnull stop1) {
+       [section.cellInfos enumerateObjectsUsingBlock:^(CPCollectionViewCellInfo * _Nonnull cell, NSUInteger itemIndex, BOOL * _Nonnull stop2) {
+           if (cell == cellInfo) {
+               indexPath = [NSIndexPath indexPathForItem:itemIndex inSection:sectionIndex];
+               *stop1 = YES;
+               *stop2 = YES;
+           }
+       }];
+    }];
+    
+    return indexPath;
+}
+
+- (NSInteger)cp_sectionForSectionInfo:(CPCollectionViewSectionInfo *)sectionInfo {
+    __block NSInteger section = -1;
+    [[self cp_sectionInfos] enumerateObjectsUsingBlock:^(CPCollectionViewSectionInfo * _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
+        if (obj == sectionInfo) {
+            section = idx;
+            *stop = YES;
+        }
+    }];
+    
+    return section;
+}
+
 #pragma mark - Register Header and Footer
 
 - (void)cp_registerHeaderAndFooterWithSectionInfos:(NSArray<CPCollectionViewSectionInfo *> *)sectionInfos {

@@ -58,6 +58,11 @@ NS_ASSUME_NONNULL_BEGIN
 - (nullable CPCollectionViewCellInfo *)cp_cellInfoForItemAtIndexPath:(NSIndexPath *)indexPath;
 - (nullable CPCollectionViewSectionInfo *)cp_sectionInfoForSection:(NSInteger)section;
 
+#pragma mark - Get Index By Cell or Section Info
+
+- (nullable NSIndexPath *)cp_indexPathForCellInfo:(CPCollectionViewCellInfo *)cellInfo;//return nil if not found
+- (NSInteger)cp_sectionForSectionInfo:(CPCollectionViewSectionInfo *)sectionInfo;//return -1 if not found
+
 @end
 
 NS_ASSUME_NONNULL_END
