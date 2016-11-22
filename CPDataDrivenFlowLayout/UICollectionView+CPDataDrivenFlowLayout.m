@@ -26,16 +26,16 @@
 
 @interface _CPCollectionViewFlowLayoutProxy : NSProxy
 
-@property (nonatomic, weak) id<NSObject> target;
+@property (nonatomic, weak) id target;
 @property (nonatomic, weak) id interceptor;
 
-- (instancetype)initWithTarget:(id<NSObject>)target interceptor:(id)interceptor;
+- (instancetype)initWithTarget:(id)target interceptor:(id)interceptor;
 
 @end
 
 @implementation _CPCollectionViewFlowLayoutProxy
 
-- (instancetype)initWithTarget:(id<NSObject>)target interceptor:(id)interceptor
+- (instancetype)initWithTarget:(id)target interceptor:(id)interceptor
 {
     if (!self) {
         return nil;
@@ -46,33 +46,52 @@
     return self;
 }
 
-- (BOOL)respondsToSelector:(SEL)aSelector
-{
-    return ([_interceptor respondsToSelector:aSelector] || [_target respondsToSelector:aSelector]);
-}
-
-- (id)forwardingTargetForSelector:(SEL)aSelector
-{
-    if ([_interceptor respondsToSelector:aSelector]) {
-        return _interceptor;
-    }
-    
-    return [_target respondsToSelector:aSelector] ? _target : nil;
-}
+#pragma mark - Forward
 
 - (NSMethodSignature *)methodSignatureForSelector:(SEL)sel {
-    if ([_target isKindOfClass:[NSObject class]]) {
-        return [(NSObject *)_target methodSignatureForSelector:sel];
+    NSMethodSignature *signature = [(id)_interceptor methodSignatureForSelector:sel];
+    if (signature) {
+        return signature;
     }
     
-    return nil;
+    signature = [(id)_target methodSignatureForSelector:sel];
+    if (signature) {
+        return signature;
+    }
+    
+    signature = [super methodSignatureForSelector:sel];
+    if (signature) {
+        return signature;
+    }
+    
+    return [[self class] voidSignature];//prevent crash when signature is nil
 }
 
 - (void)forwardInvocation:(NSInvocation *)invocation {
-    if (_target) {
-        [invocation setTarget:_target];
-        [invocation invoke];
+    id target;
+    if ([_interceptor respondsToSelector:invocation.selector]) {
+        target = _interceptor;
+    } else if ([_target respondsToSelector:invocation.selector]) {
+        target = _target;
     }
+    
+    if (target) {
+        [invocation invokeWithTarget:target];
+    } else {
+        NSMethodSignature *signature = [invocation methodSignature];
+        if (signature != [[self class] voidSignature]) {
+            [super forwardInvocation:invocation];//forward when signature is not voidSignature
+        }
+    }
+}
+
++ (NSMethodSignature *)voidSignature {
+    static NSMethodSignature *signature = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        signature = [NSMethodSignature signatureWithObjCTypes:@encode(void)];
+    });
+    return signature;
 }
 
 @end
