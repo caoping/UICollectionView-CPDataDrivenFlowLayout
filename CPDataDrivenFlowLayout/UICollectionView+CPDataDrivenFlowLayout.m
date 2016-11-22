@@ -46,6 +46,10 @@
     return self;
 }
 
+- (BOOL)respondsToSelector:(SEL)aSelector {
+    return [_interceptor respondsToSelector:aSelector] || [_target respondsToSelector:aSelector];
+}
+
 #pragma mark - Forward
 
 - (NSMethodSignature *)methodSignatureForSelector:(SEL)sel {
