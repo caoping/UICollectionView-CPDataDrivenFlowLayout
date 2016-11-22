@@ -50,6 +50,10 @@
     return [_interceptor respondsToSelector:aSelector] || [_target respondsToSelector:aSelector];
 }
 
+- (BOOL)conformsToProtocol:(Protocol *)aProtocol {
+    return [_interceptor conformsToProtocol:aProtocol] || [_target conformsToProtocol:aProtocol];
+}
+
 #pragma mark - Forward
 
 - (NSMethodSignature *)methodSignatureForSelector:(SEL)sel {
