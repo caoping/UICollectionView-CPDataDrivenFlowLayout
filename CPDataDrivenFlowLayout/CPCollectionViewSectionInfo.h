@@ -39,6 +39,8 @@ typedef CGSize (^CPCollectionViewSizeForHeaderOrFooterBlock)(__kindof UICollecti
 @property (nonatomic) CGFloat minimumInteritemSpacing;//The default value of this property is 0
 @property (nonatomic) UIEdgeInsets sectionInset;//The default edge insets are all set to 0.
 
+@property (nonatomic, nullable) __kindof NSObject *data;
+
 @property (nonatomic, nullable) Class headerClass;
 @property (nonatomic, nullable) UINib *nibForHeader;
 @property (nonatomic, nullable) NSString *headerReuseIdentifier;
