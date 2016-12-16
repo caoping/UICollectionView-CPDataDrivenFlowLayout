@@ -148,14 +148,14 @@ static NSString *_CPPlaceholderSupplementaryView = @"_CPPlaceholderSupplementary
     
     //更新delegate
     id originalDelegate = self.delegate;
-    if ([originalDelegate isKindOfClass:[_CPCollectionViewFlowLayoutProxy class]]) {
+    if ([originalDelegate class] == [_CPCollectionViewFlowLayoutProxy class]) {
         originalDelegate = [self cp_originalDelegate];//当前delegate为proxy时，使用原始delegate
     }
     [self setDelegate:originalDelegate];//此处函数调用会跳转至cp_setDelegate, 因为setDelegate被交换
     
     //更新dataSource
     id originalDataSource = self.dataSource;
-    if ([originalDataSource isKindOfClass:[_CPCollectionViewFlowLayoutProxy class]]) {
+    if ([originalDataSource class] == [_CPCollectionViewFlowLayoutProxy class]) {
         originalDataSource = [self cp_originalDataSource];//当前dataSource为proxy时，使用原始dataSource
     }
     [self setDataSource:originalDataSource];//此处函数调用会跳转至cp_setDataSource, 因为setDataSource被交换
