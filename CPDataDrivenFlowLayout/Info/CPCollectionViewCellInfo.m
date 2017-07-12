@@ -66,6 +66,25 @@
              cellDidSelectCallback:nil];
 }
 
+- (instancetype)initWithCellClass:(Class)cellClass
+              cellReuseIdentifier:(NSString *)cellReuseIdentifier
+                             data:(__kindof NSObject * _Nullable)data
+             cellDidReuseCallback:(CPCollectionViewCellBlock)cellDidReuseCallback
+              sizeForCellCallback:(CPCollectionViewCellSizeBlock)sizeForCellCallback {
+    NSParameterAssert(cellClass);
+    NSParameterAssert(cellReuseIdentifier);
+    NSParameterAssert(cellDidReuseCallback);
+    NSParameterAssert(sizeForCellCallback);
+    
+    return [self initWithCellClass:cellClass
+                        nibForCell:nil
+               cellReuseIdentifier:cellReuseIdentifier
+                              data:data
+              cellDidReuseCallback:cellDidReuseCallback
+               sizeForCellCallback:sizeForCellCallback
+             cellDidSelectCallback:nil];
+}
+
 #pragma mark - Convenience Initializers With Nib
 
 - (instancetype)initWithNibForCell:(UINib *)nibForCell
@@ -78,6 +97,7 @@
     NSParameterAssert(cellDidReuseCallback);
     NSParameterAssert(sizeForCellCallback);
     
+    NSAssert([self checkNibIdentifierInDebug:nibForCell cellReuseIdentifier:cellReuseIdentifier], @"");
     return [self initWithCellClass:nil
                         nibForCell:nibForCell
                cellReuseIdentifier:cellReuseIdentifier
@@ -85,6 +105,22 @@
               cellDidReuseCallback:cellDidReuseCallback
                sizeForCellCallback:sizeForCellCallback
              cellDidSelectCallback:nil];
+}
+
+- (BOOL)checkNibIdentifierInDebug:(UINib *)nib cellReuseIdentifier:(NSString *)cellReuseIdentifier {
+    NSArray *views = [nib instantiateWithOwner:nil options:nil];
+    UICollectionReusableView *reusableView;
+    for (UIView *view in views) {
+        if ([view isKindOfClass:[UICollectionReusableView class]]) {
+            reusableView = (UICollectionReusableView *)view;
+            break;
+        }
+    }
+    
+    NSAssert(reusableView, @"%@ must contains UICollectionReusableView instance as root view", nib);
+    NSAssert(reusableView.reuseIdentifier.length == 0 || [reusableView.reuseIdentifier isEqualToString:cellReuseIdentifier], @"%@ contains UICollectionReusableView instance reuseIdentifier is not equal to %@", nib, cellReuseIdentifier);
+    
+    return YES;
 }
 
 

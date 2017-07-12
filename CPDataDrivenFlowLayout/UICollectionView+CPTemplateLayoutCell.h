@@ -1,3 +1,5 @@
+//
+//  UICollectionView+CPTemplateLayoutCell.h
 // The MIT License (MIT)
 //
 // Copyright (c) 2016 caoping <caoping.dev@gmail.com>
@@ -29,25 +31,24 @@ typedef NS_ENUM(NSInteger, CPPreferredLayoutDimension) {
 
 NS_ASSUME_NONNULL_BEGIN
 
-/**
- Template auto layout Cell/SupplementaryView for automatically UICollectionViewCell/UICollectionReusableView height calculating (inspired by UITableView-FDTemplateLayoutCell)
- */
 @interface UICollectionView (CPTemplateLayoutCell)
+
+#pragma mark - Get Template Cell or SupplementaryView
 
 - (__kindof UICollectionReusableView *)cp_templateSupplementaryViewOfKind:(NSString *)kind
                                                           reuseIdentifier:(NSString *)identifier;
 
 - (__kindof UICollectionViewCell *)cp_templateCellForReuseIdentifier:(NSString *)identifier;
 
-#pragma mark - CollectionView Cell
+#pragma mark - Calculating CollectionView Cell Size
 
 /**
- calculating cell size by registered cell identifier and preferred layout dimension
+ 根据已注册collectionViewCell的identifier及期望的宽度or高度，返回cell的尺寸
  
- @param identifier               registered cell identifier
- @param preferredLayoutDimension dimension(Width or Height) used to calculating cell size
- @param preferredLayoutValue     dimension value
- @param configuration            configuration cell block
+ @param identifier               已注册collectionViewCell的identifier
+ @param preferredLayoutDimension 用于计算期望cell尺寸的固定值类型枚举，Width or Height
+ @param preferredLayoutValue     用于计算期望cell尺寸的固定值
+ @param configuration            配置cell的block
  
  @return CGSize
  */
@@ -57,13 +58,13 @@ NS_ASSUME_NONNULL_BEGIN
                          configuration:(nullable void (^)(__kindof UICollectionViewCell *cell))configuration;
 
 /**
- calculating cell size by registered cell identifier and preferred layout dimension, size will be cached by indexPath (Unimplemented)
+ 根据已注册collectionViewCell的identifier及期望的宽度or高度，返回cell的尺寸 (cache暂未实现)
  
- @param identifier               registered cell identifier
- @param preferredLayoutDimension dimension(Width or Height) used to calculating cell size
- @param preferredLayoutValue     dimension value
- @param indexPath                used to cache
- @param configuration            configuration cell block
+ @param identifier               已注册collectionViewCell的identifier
+ @param preferredLayoutDimension 用于计算期望cell尺寸的固定值类型枚举，Width or Height
+ @param preferredLayoutValue     用于计算期望cell尺寸的固定值
+ @param indexPath                根据indexPath缓存cell size
+ @param configuration            配置cell的block
  
  @return CGSize
  */
@@ -73,16 +74,17 @@ NS_ASSUME_NONNULL_BEGIN
                       cacheByIndexPath:(NSIndexPath *)indexPath
                          configuration:(nullable void (^)(__kindof UICollectionViewCell *cell))configuration;
 
-#pragma mark - Supplementary View
+#pragma mark - Calculating Supplementary View Size
+
 
 /**
- calculating view size by registered supplementary view identifier and preferred layout dimension
+ 根据已注册SupplementaryView的identifier及期望的宽度or高度，返回view的尺寸
  
- @param kind                     registered supplementary view kind
- @param identifier               registered supplementary view identifier
- @param preferredLayoutDimension dimension(Width or Height) used to calculating view size
- @param preferredLayoutValue     dimension value
- @param configuration            configuration cell block
+ @param kind                     SupplementaryViewKind
+ @param identifier               已注册SupplementaryView的identifier
+ @param preferredLayoutDimension 用于计算期望view尺寸的固定值类型枚举，Width or Height
+ @param preferredLayoutValue     用于计算期望view尺寸的固定值
+ @param configuration            配置view的block
  
  @return CGSize
  */

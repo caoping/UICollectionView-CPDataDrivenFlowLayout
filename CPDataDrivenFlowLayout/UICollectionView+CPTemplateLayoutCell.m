@@ -90,71 +90,22 @@
     return templateCell;
 }
 
-#pragma mark - Public
+#pragma mark - Calculating CollectionView Cell Size
 
 - (CGSize)cp_sizeForCellWithIdentifier:(NSString *)identifier
               preferredLayoutDimension:(CPPreferredLayoutDimension)preferredLayoutDimension
                   preferredLayoutValue:(CGFloat)preferredLayoutValue
                          configuration:(nullable void (^)(__kindof UICollectionViewCell *cell))configuration {
-    if (!identifier) {
+    if (!identifier || preferredLayoutValue <= 0) {
         return CGSizeZero;
     }
     
-    NSLayoutConstraint *tempConstraint;
     UICollectionViewCell *templateLayoutCell = [self cp_templateCellForReuseIdentifier:identifier];
     
-    CGRect frame = templateLayoutCell.frame;
-    switch (preferredLayoutDimension) {
-        case CPPreferredLayoutDimensionWidth:
-        {
-            frame.size.width = preferredLayoutValue;
-            tempConstraint = [NSLayoutConstraint constraintWithItem:templateLayoutCell.contentView attribute:NSLayoutAttributeWidth relatedBy:NSLayoutRelationEqual toItem:nil attribute:NSLayoutAttributeNotAnAttribute multiplier:1 constant:preferredLayoutValue];
-        }
-            break;
-        case CPPreferredLayoutDimensionHeight:
-        {
-            frame.size.height = preferredLayoutValue;
-            tempConstraint = [NSLayoutConstraint constraintWithItem:templateLayoutCell.contentView attribute:NSLayoutAttributeHeight relatedBy:NSLayoutRelationEqual toItem:nil attribute:NSLayoutAttributeNotAnAttribute multiplier:1 constant:preferredLayoutValue];
-        }
-            break;
-    }
-    templateLayoutCell.frame = frame;
-    [templateLayoutCell prepareForReuse];
-    [templateLayoutCell setNeedsLayout];
-    [templateLayoutCell layoutIfNeeded];
-    if (configuration) {
-        configuration(templateLayoutCell);
-    }
-    
-    CGSize fittingSize = CGSizeZero;
-    if (tempConstraint && preferredLayoutValue > 0) {
-        [templateLayoutCell.contentView addConstraint:tempConstraint];
-        fittingSize = [templateLayoutCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize];
-        [templateLayoutCell.contentView removeConstraint:tempConstraint];
-        
-        switch (preferredLayoutDimension) {
-            case CPPreferredLayoutDimensionWidth:
-            {
-                if (fittingSize.width != preferredLayoutValue) {
-                    //in iPhone 6 Plus display zoom mode, size must be scaling
-                    fittingSize.height = preferredLayoutValue/(fittingSize.width/fittingSize.height);
-                    fittingSize.width = preferredLayoutValue;
-                }
-            }
-                break;
-            case CPPreferredLayoutDimensionHeight:
-            {
-                if (fittingSize.height != preferredLayoutValue) {
-                    //in iPhone 6 Plus display zoom mode, size must be scaling
-                    fittingSize.width = preferredLayoutValue/(fittingSize.height/fittingSize.width);
-                    fittingSize.height = preferredLayoutValue;
-                }
-            }
-                break;
-        }
-    }
-    
-    return fittingSize;
+    return [self cp_sizeForReusableView:templateLayoutCell
+               preferredLayoutDimension:preferredLayoutDimension
+                   preferredLayoutValue:preferredLayoutValue
+                          configuration:configuration];
 }
 
 - (CGSize)cp_sizeForCellWithIdentifier:(NSString *)identifier
@@ -162,75 +113,121 @@
                   preferredLayoutValue:(CGFloat)preferredLayoutValue
                       cacheByIndexPath:(NSIndexPath *)indexPath
                          configuration:(nullable void (^)(__kindof UICollectionViewCell *cell))configuration {
-    if (!identifier || !indexPath) {
+    if (!identifier || preferredLayoutValue <= 0) {
         return CGSizeZero;
     }
     
-    CGSize size = [self cp_sizeForCellWithIdentifier:identifier preferredLayoutDimension:preferredLayoutDimension preferredLayoutValue:preferredLayoutValue configuration:configuration];
-    
-    return size;
+    return [self cp_sizeForCellWithIdentifier:identifier
+                     preferredLayoutDimension:preferredLayoutDimension
+                         preferredLayoutValue:preferredLayoutValue
+                                configuration:configuration];
 }
 
-#pragma mark - Supplementary View
+#pragma mark - Calculating Supplementary View Size
 
 - (CGSize)cp_sizeForSupplementaryViewOfKind:(NSString *)kind
                                  identifier:(NSString *)identifier
                    preferredLayoutDimension:(CPPreferredLayoutDimension)preferredLayoutDimension
                        preferredLayoutValue:(CGFloat)preferredLayoutValue
                               configuration:(nullable void (^)(__kindof UICollectionReusableView *supplementaryView))configuration {
-    if (!identifier) {
+    if (!identifier || preferredLayoutValue <= 0) {
         return CGSizeZero;
     }
     
     UICollectionReusableView *templateLayoutSupplementaryView = [self cp_templateSupplementaryViewOfKind:kind reuseIdentifier:identifier];
-    [templateLayoutSupplementaryView prepareForReuse];
-    if (configuration) {
-        configuration(templateLayoutSupplementaryView);
+    return [self cp_sizeForReusableView:templateLayoutSupplementaryView
+               preferredLayoutDimension:preferredLayoutDimension
+                   preferredLayoutValue:preferredLayoutValue
+                          configuration:configuration];
+}
+
+#pragma mark - Calculating ReusableView Size
+
+- (CGSize)cp_sizeForReusableView:(__kindof UICollectionReusableView *)reusableView
+        preferredLayoutDimension:(CPPreferredLayoutDimension)preferredLayoutDimension
+            preferredLayoutValue:(CGFloat)preferredLayoutValue
+                   configuration:(nullable void (^)(__kindof UICollectionReusableView *reusableView))configuration {
+    if (!reusableView || preferredLayoutValue <= 0) {
+        return CGSizeZero;
     }
     
-    NSLayoutConstraint *tempConstraint;
+    CGSize fittingSize = UILayoutFittingCompressedSize;
+    UILayoutPriority hFittingPriority = UILayoutPriorityRequired;
+    UILayoutPriority vFittingPriority = UILayoutPriorityRequired;
+    UICollectionViewCell *templateLayoutCell;
+    
+    //如果reusableView为Cell时
+    if ([reusableView isKindOfClass:[UICollectionViewCell class]]) {
+        templateLayoutCell = reusableView;
+        
+        //修正Cell frame
+        CGRect frame = templateLayoutCell.frame;
+        if (preferredLayoutDimension == CPPreferredLayoutDimensionWidth) {
+            frame.size.width = preferredLayoutValue;
+        } else {
+            frame.size.height = preferredLayoutValue;
+        }
+        templateLayoutCell.frame = frame;
+    }
+    
+    //根据Dimension设置计算参数
     switch (preferredLayoutDimension) {
         case CPPreferredLayoutDimensionWidth:
         {
-            tempConstraint = [NSLayoutConstraint constraintWithItem:templateLayoutSupplementaryView attribute:NSLayoutAttributeWidth relatedBy:NSLayoutRelationEqual toItem:nil attribute:NSLayoutAttributeNotAnAttribute multiplier:1 constant:preferredLayoutValue];
+            fittingSize.width = preferredLayoutValue;
+            vFittingPriority = UILayoutPriorityFittingSizeLevel;
         }
             break;
         case CPPreferredLayoutDimensionHeight:
         {
-            tempConstraint = [NSLayoutConstraint constraintWithItem:templateLayoutSupplementaryView attribute:NSLayoutAttributeHeight relatedBy:NSLayoutRelationEqual toItem:nil attribute:NSLayoutAttributeNotAnAttribute multiplier:1 constant:preferredLayoutValue];
+            fittingSize.height = preferredLayoutValue;
+            hFittingPriority = UILayoutPriorityFittingSizeLevel;
         }
             break;
     }
     
-    CGSize fittingSize = CGSizeZero;
-    if (tempConstraint && preferredLayoutValue > 0) {
-        [templateLayoutSupplementaryView addConstraint:tempConstraint];
-        fittingSize = [templateLayoutSupplementaryView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize];
-        [templateLayoutSupplementaryView removeConstraint:tempConstraint];
-        
-        switch (preferredLayoutDimension) {
-            case CPPreferredLayoutDimensionWidth:
-            {
-                if (fittingSize.width != preferredLayoutValue) {
-                    //in iPhone 6 Plus display zoom mode, size must be scaling
-                    fittingSize.height = preferredLayoutValue/(fittingSize.width/fittingSize.height);
-                    fittingSize.width = preferredLayoutValue;
-                }
-            }
-                break;
-            case CPPreferredLayoutDimensionHeight:
-            {
-                if (fittingSize.height != preferredLayoutValue) {
-                    //in iPhone 6 Plus display zoom mode, size must be scaling
-                    fittingSize.width = preferredLayoutValue/(fittingSize.height/fittingSize.width);
-                    fittingSize.height = preferredLayoutValue;
-                }
-            }
-                break;
-        }
+    //prepare and configuration
+    [reusableView prepareForReuse];
+    if (configuration) {
+        configuration(reusableView);
     }
     
-    return fittingSize;
+    UIView *templateLayoutView = reusableView;
+    if (templateLayoutCell) {
+        //Cell需要使用其contentView计算尺寸
+        [templateLayoutCell setNeedsLayout];
+        [templateLayoutCell layoutIfNeeded];
+        templateLayoutView = templateLayoutCell.contentView;
+    }
+    
+    CGSize systemLayoutSize = [templateLayoutView systemLayoutSizeFittingSize:fittingSize
+                                                withHorizontalFittingPriority:hFittingPriority
+                                                      verticalFittingPriority:vFittingPriority];
+    NSAssert(!CGSizeEqualToSize(systemLayoutSize, CGSizeZero), @"invalid systemLayoutSize");
+    
+    //检查是否需要修正
+    switch (preferredLayoutDimension) {
+        case CPPreferredLayoutDimensionWidth:
+        {
+            if (systemLayoutSize.width != preferredLayoutValue) {
+                //iPhone 6 Plus在系统设置放大模式下，此处需要根据比例修正height
+                systemLayoutSize.height = preferredLayoutValue/(systemLayoutSize.width/systemLayoutSize.height);
+                systemLayoutSize.width = preferredLayoutValue;
+            }
+        }
+            break;
+        case CPPreferredLayoutDimensionHeight:
+        {
+            if (systemLayoutSize.height != preferredLayoutValue) {
+                //iPhone 6 Plus在系统设置放大模式下，此处需要根据比例修正width
+                systemLayoutSize.width = preferredLayoutValue/(systemLayoutSize.height/systemLayoutSize.width);
+                systemLayoutSize.height = preferredLayoutValue;
+            }
+        }
+            break;
+    }
+    
+    return systemLayoutSize;
 }
 
 @end

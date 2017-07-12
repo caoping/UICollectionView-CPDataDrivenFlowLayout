@@ -27,9 +27,7 @@
 NS_ASSUME_NONNULL_BEGIN
 
 typedef void (^CPCollectionViewCellBlock)(__kindof UICollectionView *collectionView, __kindof UICollectionViewCell *cell, NSIndexPath *indexPath, __kindof NSObject * _Nullable data);
-
 typedef CGSize (^CPCollectionViewPreferredLayoutBlock)(CPPreferredLayoutDimension dimension, CGFloat preferredLayoutValue);
-
 typedef CGSize (^CPCollectionViewCellSizeBlock)(__kindof UICollectionView *collectionView, __kindof UICollectionViewLayout *layout, CPCollectionViewPreferredLayoutBlock sizeByPreferredLayoutCalculator);
 
 @interface CPCollectionViewCellInfo : NSObject
@@ -49,6 +47,12 @@ typedef CGSize (^CPCollectionViewCellSizeBlock)(__kindof UICollectionView *colle
 #pragma mark - Initializers With Class
 
 - (instancetype)initWithCellClass:(Class)cellClass
+                             data:(__kindof NSObject * _Nullable)data
+             cellDidReuseCallback:(CPCollectionViewCellBlock)cellDidReuseCallback
+              sizeForCellCallback:(CPCollectionViewCellSizeBlock)sizeForCellCallback;
+
+- (instancetype)initWithCellClass:(Class)cellClass
+              cellReuseIdentifier:(NSString *)cellReuseIdentifier
                              data:(__kindof NSObject * _Nullable)data
              cellDidReuseCallback:(CPCollectionViewCellBlock)cellDidReuseCallback
               sizeForCellCallback:(CPCollectionViewCellSizeBlock)sizeForCellCallback;

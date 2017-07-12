@@ -24,10 +24,11 @@
 #import <objc/runtime.h>
 #import "UICollectionView+CPTemplateLayoutCell.h"
 
+
 @interface _CPCollectionViewFlowLayoutProxy : NSProxy
 
 @property (nonatomic, weak) id target;
-@property (nonatomic, weak) id interceptor;
+@property (nonatomic, strong) id interceptor;
 
 - (instancetype)initWithTarget:(id)target interceptor:(id)interceptor;
 
@@ -67,29 +68,18 @@
         return signature;
     }
     
-    signature = [super methodSignatureForSelector:sel];
-    if (signature) {
-        return signature;
-    }
-    
     return [[self class] voidSignature];//prevent crash when signature is nil
 }
 
 - (void)forwardInvocation:(NSInvocation *)invocation {
-    id target;
-    if ([_interceptor respondsToSelector:invocation.selector]) {
-        target = _interceptor;
-    } else if ([_target respondsToSelector:invocation.selector]) {
-        target = _target;
+    if ([invocation methodSignature] == [[self class] voidSignature]) {
+        return;
     }
+    if ([_interceptor respondsToSelector:invocation.selector]) {
     
-    if (target) {
-        [invocation invokeWithTarget:target];
-    } else {
-        NSMethodSignature *signature = [invocation methodSignature];
-        if (signature != [[self class] voidSignature]) {
-            [super forwardInvocation:invocation];//forward when signature is not voidSignature
-        }
+        [invocation invokeWithTarget:_interceptor];
+    } else if ([_target respondsToSelector:invocation.selector]) {
+        [invocation invokeWithTarget:_target];
     }
 }
 
@@ -104,62 +94,14 @@
 
 @end
 
-static NSString *_CPPlaceholderSupplementaryView = @"_CPPlaceholderSupplementaryView";
+
 
 @implementation UICollectionView (CPDataDrivenFlowLayout)
 
-#define __DescriptionForAssert [NSString stringWithFormat:@"invoke %@ before must be set cp_dataDrivenFlowLayoutEnabled value to YES",NSStringFromSelector(_cmd)]
-#define CPDataDrivenFlowLayoutEnabledAssert() NSAssert(self.cp_dataDrivenFlowLayoutEnabled, __DescriptionForAssert)
-
-#pragma mark - Method Exchange
-
-+ (void)load {
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        Class class = [self class];
-        Method originalDelegateSetter = class_getInstanceMethod(class, @selector(setDelegate:));
-        Method myDelegateSetter = class_getInstanceMethod(class, @selector(cp_setDelegate:));
-        if (originalDelegateSetter && myDelegateSetter) {
-            method_exchangeImplementations(originalDelegateSetter, myDelegateSetter);
-        }
-        
-        Method originalDataSourceSetter = class_getInstanceMethod(class, @selector(setDataSource:));
-        Method myDataSourceSetter = class_getInstanceMethod(class, @selector(cp_setDataSource:));
-        if (originalDataSourceSetter && myDataSourceSetter) {
-            method_exchangeImplementations(originalDataSourceSetter, myDataSourceSetter);
-        }
-        
-        Method originalDealloc = class_getInstanceMethod(class, NSSelectorFromString(@"dealloc"));
-        Method myDealloc = class_getInstanceMethod(class, @selector(cp_dealloc));
-        if (originalDealloc && myDealloc) {
-            method_exchangeImplementations(originalDealloc, myDealloc);
-        }
-    });
-}
+#define __DescriptionForAssert [NSString stringWithFormat:@"invoke %@ before must be set cp_delegateProxy/cp_dataSourceProxy interceptor",NSStringFromSelector(_cmd)]
+#define CPDataDrivenFlowLayoutEnabledAssert() NSAssert([self cp_delegateProxy].interceptor && [self cp_dataSourceProxy].interceptor, __DescriptionForAssert)
 
 #pragma mark - Associated Object
-
-- (BOOL)cp_dataDrivenFlowLayoutEnabled {
-    return [objc_getAssociatedObject(self, _cmd) boolValue];
-}
-
-- (void)setCp_dataDrivenFlowLayoutEnabled:(BOOL)cp_dataDrivenFlowLayoutEnabled {
-    objc_setAssociatedObject(self, @selector(cp_dataDrivenFlowLayoutEnabled), @(cp_dataDrivenFlowLayoutEnabled), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    
-    //更新delegate
-    id originalDelegate = self.delegate;
-    if ([originalDelegate class] == [_CPCollectionViewFlowLayoutProxy class]) {
-        originalDelegate = [self cp_originalDelegate];//当前delegate为proxy时，使用原始delegate
-    }
-    [self setDelegate:originalDelegate];//此处函数调用会跳转至cp_setDelegate, 因为setDelegate被交换
-    
-    //更新dataSource
-    id originalDataSource = self.dataSource;
-    if ([originalDataSource class] == [_CPCollectionViewFlowLayoutProxy class]) {
-        originalDataSource = [self cp_originalDataSource];//当前dataSource为proxy时，使用原始dataSource
-    }
-    [self setDataSource:originalDataSource];//此处函数调用会跳转至cp_setDataSource, 因为setDataSource被交换
-}
 
 - (NSArray<CPCollectionViewSectionInfo *> *)cp_sectionInfos {
     return objc_getAssociatedObject(self, _cmd);
@@ -172,7 +114,13 @@ static NSString *_CPPlaceholderSupplementaryView = @"_CPPlaceholderSupplementary
 #pragma mark - Delegate and DataSource Proxy
 
 - (_CPCollectionViewFlowLayoutProxy *)cp_delegateProxy {
-    return objc_getAssociatedObject(self, _cmd);
+    _CPCollectionViewFlowLayoutProxy *proxy = objc_getAssociatedObject(self, _cmd);
+    if (!proxy) {
+        proxy = [[_CPCollectionViewFlowLayoutProxy alloc] initWithTarget:nil interceptor:nil];
+        [self setCp_delegateProxy:proxy];
+    }
+    
+    return proxy;
 }
 
 - (void)setCp_delegateProxy:(_CPCollectionViewFlowLayoutProxy *)cp_delegateProxy {
@@ -180,74 +128,50 @@ static NSString *_CPPlaceholderSupplementaryView = @"_CPPlaceholderSupplementary
 }
 
 - (_CPCollectionViewFlowLayoutProxy *)cp_dataSourceProxy {
-    return objc_getAssociatedObject(self, _cmd);
+    _CPCollectionViewFlowLayoutProxy *proxy = objc_getAssociatedObject(self, _cmd);
+    if (!proxy) {
+        proxy = [[_CPCollectionViewFlowLayoutProxy alloc] initWithTarget:nil interceptor:nil];
+        [self setCp_dataSourceProxy:proxy];
+    }
+    
+    return proxy;
 }
 
 - (void)setCp_dataSourceProxy:(_CPCollectionViewFlowLayoutProxy *)cp_dataSourceProxy {
     objc_setAssociatedObject(self, @selector(cp_dataSourceProxy), cp_dataSourceProxy, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
-#pragma mark - Original Delegate and DataSource
+#pragma mark - 
 
-- (id)cp_originalDelegate {
-    return objc_getAssociatedObject(self, _cmd);
+- (void)cp_enableDataDrivenFlowLayout {
+    [self cp_setDefaultInterceptorForCurrentDelegateAndDataSource];
 }
 
-- (void)setCp_originalDelegate:(id)cp_originalDelegate {
-    objc_setAssociatedObject(self, @selector(cp_originalDelegate), cp_originalDelegate, OBJC_ASSOCIATION_ASSIGN);
+- (void)cp_setDefaultInterceptorForCurrentDelegateAndDataSource {
+    [self cp_setDelegate:self.delegate interceptor:[CPCollectionViewDelegateFlowLayoutInterceptor new]];
+    [self cp_setDataSource:self.dataSource interceptor:[CPCollectionViewDataSourceInterceptor new]];
 }
 
-- (id)cp_originalDataSource {
-    return objc_getAssociatedObject(self, _cmd);
-}
+#pragma mark - Set Delegate & DataSource
 
-- (void)setCp_originalDataSource:(id)cp_originalDataSource {
-    objc_setAssociatedObject(self, @selector(cp_originalDataSource), cp_originalDataSource, OBJC_ASSOCIATION_ASSIGN);
-}
-
-#pragma mark - Method Exchange Implementations
-
-- (void)cp_dealloc {
-    [self setCp_delegateProxy:nil];
-    [self setCp_dataSourceProxy:nil];
-    objc_setAssociatedObject(self, @selector(cp_dataDrivenFlowLayoutEnabled), @(NO), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    [self cp_dealloc];
-}
-
-- (void)cp_setDelegate:(id<UICollectionViewDelegate>)delegate {
-    [self setCp_originalDelegate:delegate];//为关闭dataDrivenFlowLayout时还原代理，在此处存储原始delegate的弱引用
+- (void)cp_setDelegate:(id<UICollectionViewDelegate>)delegate interceptor:(id<UICollectionViewDelegateFlowLayout>)interceptor {
+    NSParameterAssert(interceptor);
     
-    if (self.cp_dataDrivenFlowLayoutEnabled) {
-        id delegateProxy = [self createDelegateProxyWithOriginalDelegate:delegate];
-        [self cp_setDelegate:delegateProxy];
-    } else {
-        [self cp_setDelegate:delegate];
+    if (delegate != [self cp_delegateProxy]) {
+        [self cp_delegateProxy].target = delegate;
+        [self cp_delegateProxy].interceptor = interceptor;
+        [self setDelegate:(id <UICollectionViewDelegate>)[self cp_delegateProxy]];
     }
 }
 
-- (void)cp_setDataSource:(id<UICollectionViewDataSource>)dataSource {
-    [self setCp_originalDataSource:dataSource];//为关闭dataDrivenFlowLayout时还原代理，在此处存储原始dataSource的弱引用
+- (void)cp_setDataSource:(id<UICollectionViewDataSource>)dataSource interceptor:(id<UICollectionViewDelegateFlowLayout>)interceptor {
+    NSParameterAssert(interceptor);
     
-    if (self.cp_dataDrivenFlowLayoutEnabled) {
-        id dataSourceProxy = [self createDataSourceProxyWithOriginalDataSource:dataSource];
-        [self cp_setDataSource:dataSourceProxy];
-    } else {
-        [self cp_setDataSource:dataSource];
+    if (dataSource != [self cp_dataSourceProxy]) {
+        [self cp_dataSourceProxy].target = dataSource;
+        [self cp_dataSourceProxy].interceptor = interceptor;
+        [self setDataSource:(id <UICollectionViewDataSource>)[self cp_dataSourceProxy]];
     }
-}
-
-#pragma mark - Create Proxy
-
-- (id)createDelegateProxyWithOriginalDelegate:(id)originalDelegate {
-    id delegateProxy = [[_CPCollectionViewFlowLayoutProxy alloc] initWithTarget:originalDelegate interceptor:self];
-    [self setCp_delegateProxy:delegateProxy];
-    return delegateProxy;
-}
-
-- (id)createDataSourceProxyWithOriginalDataSource:(id)originalDataSource {
-    id dataSourceProxy = [[_CPCollectionViewFlowLayoutProxy alloc] initWithTarget:originalDataSource interceptor:self];
-    [self setCp_dataSourceProxy:dataSourceProxy];
-    return dataSourceProxy;
 }
 
 #pragma mark - Reloading
@@ -445,185 +369,6 @@ static NSString *_CPPlaceholderSupplementaryView = @"_CPPlaceholderSupplementary
     return NO;
 }
 
-#pragma mark - UICollectionViewDelegateFlowLayout
-
-- (UIEdgeInsets)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout*)collectionViewLayout insetForSectionAtIndex:(NSInteger)section {
-    CPCollectionViewSectionInfo *sectionInfo = [self cp_sectionInfoForSection:section];
-    if (sectionInfo) {
-        return sectionInfo.sectionInset;
-    } else if ([collectionViewLayout isKindOfClass:[UICollectionViewFlowLayout class]]) {
-        return [(UICollectionViewFlowLayout *)collectionViewLayout sectionInset];
-    }
-    
-    return UIEdgeInsetsZero;
-}
-
-- (CGFloat)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)collectionViewLayout minimumLineSpacingForSectionAtIndex:(NSInteger)section {
-    CPCollectionViewSectionInfo *sectionInfo = [self cp_sectionInfoForSection:section];
-    if (sectionInfo) {
-        return sectionInfo.minimumLineSpacing;
-    } else if ([collectionViewLayout isKindOfClass:[UICollectionViewFlowLayout class]]) {
-        return [(UICollectionViewFlowLayout *)collectionViewLayout minimumLineSpacing];
-    }
-    
-    return 0;
-}
-
-- (CGFloat)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)collectionViewLayout minimumInteritemSpacingForSectionAtIndex:(NSInteger)section {
-    CPCollectionViewSectionInfo *sectionInfo = [self cp_sectionInfoForSection:section];
-    if (sectionInfo) {
-        return sectionInfo.minimumInteritemSpacing;
-    } else if ([collectionViewLayout isKindOfClass:[UICollectionViewFlowLayout class]]) {
-        return [(UICollectionViewFlowLayout *)collectionViewLayout minimumInteritemSpacing];
-    }
-    
-    return 0;
-}
-
-//size for cell
-- (CGSize)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout*)collectionViewLayout sizeForItemAtIndexPath:(NSIndexPath *)indexPath {
-    CPCollectionViewCellInfo *cellInfo = [self cp_cellInfoForItemAtIndexPath:indexPath];
-    if (cellInfo.sizeForCellCallback) {
-        //根据preferredLayout计算cell size的计算器
-        CPCollectionViewPreferredLayoutBlock sizeByPreferredLayoutCalculator = ^(CPPreferredLayoutDimension dimension, CGFloat preferredLayoutValue) {
-            CGSize size = CGSizeZero;
-            
-            if (cellInfo.cellReuseIdentifier) {
-                size = [collectionView cp_sizeForCellWithIdentifier:cellInfo.cellReuseIdentifier preferredLayoutDimension:dimension preferredLayoutValue:preferredLayoutValue configuration:^(__kindof UICollectionViewCell * _Nonnull cell) {
-                    if (cellInfo.cellDidReuseCallback) {
-                        cellInfo.cellDidReuseCallback(collectionView, cell, indexPath, cellInfo.data);
-                    }
-                }];
-            }
-            
-            return size;
-        };
-        
-        return cellInfo.sizeForCellCallback(collectionView, collectionViewLayout, sizeByPreferredLayoutCalculator);
-    }
-    
-    return CGSizeZero;
-}
-
-//size for header
-- (CGSize)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)collectionViewLayout referenceSizeForHeaderInSection:(NSInteger)section {
-    CPCollectionViewSectionInfo *sectionInfo = [self cp_sectionInfoForSection:section];
-    if (sectionInfo.sizeForHeaderCallback) {
-        //根据preferredLayout计算cell size的计算器
-        CPCollectionViewPreferredLayoutBlock sizeByPreferredLayoutCalculator = ^(CPPreferredLayoutDimension dimension, CGFloat preferredLayoutValue) {
-            CGSize size = CGSizeZero;
-            
-            if (sectionInfo.headerReuseIdentifier) {
-                size = [collectionView cp_sizeForSupplementaryViewOfKind:UICollectionElementKindSectionHeader identifier:sectionInfo.headerReuseIdentifier preferredLayoutDimension:dimension preferredLayoutValue:preferredLayoutValue configuration:^(__kindof UICollectionReusableView * _Nonnull supplementaryView) {
-                    if (sectionInfo.headerDidReuseCallback) {
-                        sectionInfo.headerDidReuseCallback(collectionView, supplementaryView, section);
-                    }
-                }];
-            }
-            
-            return size;
-        };
-        
-        return sectionInfo.sizeForHeaderCallback(collectionView, collectionViewLayout, sizeByPreferredLayoutCalculator);
-    }
-    
-    return CGSizeZero;
-}
-
-//size for footer
-- (CGSize)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)collectionViewLayout referenceSizeForFooterInSection:(NSInteger)section {
-    CPCollectionViewSectionInfo *sectionInfo = [self cp_sectionInfoForSection:section];
-    if (sectionInfo.sizeForFooterCallback) {
-        //根据preferredLayout计算cell size的计算器
-        CPCollectionViewPreferredLayoutBlock sizeByPreferredLayoutCalculator = ^(CPPreferredLayoutDimension dimension, CGFloat preferredLayoutValue) {
-            CGSize size = CGSizeZero;
-            
-            if (sectionInfo.footerReuseIdentifier) {
-                size = [collectionView cp_sizeForSupplementaryViewOfKind:UICollectionElementKindSectionFooter identifier:sectionInfo.footerReuseIdentifier preferredLayoutDimension:dimension preferredLayoutValue:preferredLayoutValue configuration:^(__kindof UICollectionReusableView * _Nonnull supplementaryView) {
-                    if (sectionInfo.footerDidReuseCallback) {
-                        sectionInfo.footerDidReuseCallback(collectionView, supplementaryView, section);
-                    }
-                }];
-            }
-            
-            return size;
-        };
-        
-        return sectionInfo.sizeForFooterCallback(collectionView, collectionViewLayout, sizeByPreferredLayoutCalculator);
-    }
-    
-    return CGSizeZero;
-}
-
-- (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
-    CPCollectionViewCellInfo *cellInfo = [self cp_cellInfoForItemAtIndexPath:indexPath];
-    if (cellInfo && cellInfo.cellDidSelectCallback) {
-        cellInfo.cellDidSelectCallback(collectionView, [collectionView cellForItemAtIndexPath:indexPath], indexPath, cellInfo.data);
-    }
-}
-
-#pragma mark - UICollectionViewDataSource
-
-- (NSInteger)numberOfSectionsInCollectionView:(UICollectionView *)collectionView {
-    if ([self cp_sectionInfos].count > 0) {
-        return [self cp_sectionInfos].count;
-    }
-    
-    return 1;
-}
-
-- (NSInteger)collectionView:(UICollectionView *)collectionView numberOfItemsInSection:(NSInteger)section {
-    CPCollectionViewSectionInfo *sectionInfo = [self cp_sectionInfoForSection:section];
-    if (sectionInfo) {
-        return sectionInfo.numberOfItems;
-    }
-    
-    return 0;
-}
-
-//cell
-- (UICollectionViewCell *)collectionView:(UICollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath {
-    CPCollectionViewCellInfo *cellInfo = [self cp_cellInfoForItemAtIndexPath:indexPath];
-    if (cellInfo) {
-        UICollectionViewCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:cellInfo.cellReuseIdentifier forIndexPath:indexPath];
-        if (cellInfo.cellDidReuseCallback) {
-            cellInfo.cellDidReuseCallback(collectionView, cell, indexPath, cellInfo.data);
-        }
-        
-        return cell;
-    }
-    
-    return nil;
-}
-
-//header or footer
-- (UICollectionReusableView *)collectionView:(UICollectionView *)collectionView viewForSupplementaryElementOfKind:(NSString *)kind atIndexPath:(NSIndexPath *)indexPath {
-    CPCollectionViewSectionInfo *sectionInfo = [self cp_sectionInfoForSection:indexPath.section];
-    if (sectionInfo) {
-        if (sectionInfo.headerReuseIdentifier && [kind isEqualToString:UICollectionElementKindSectionHeader]) {
-            //header
-            UICollectionReusableView *header = [collectionView dequeueReusableSupplementaryViewOfKind:kind
-                                                                                  withReuseIdentifier:sectionInfo.headerReuseIdentifier
-                                                                                         forIndexPath:indexPath];
-            if (sectionInfo.headerDidReuseCallback) {
-                sectionInfo.headerDidReuseCallback(collectionView, header, indexPath.section);
-            }
-            return header;
-            
-        } else if (sectionInfo.footerReuseIdentifier && [kind isEqualToString:UICollectionElementKindSectionFooter]) {
-            //header
-            UICollectionReusableView *footer = [collectionView dequeueReusableSupplementaryViewOfKind:kind
-                                                                                  withReuseIdentifier:sectionInfo.footerReuseIdentifier
-                                                                                         forIndexPath:indexPath];
-            if (sectionInfo.footerDidReuseCallback) {
-                sectionInfo.footerDidReuseCallback(collectionView, footer, indexPath.section);
-            }
-            return footer;
-        }
-    }
-    
-    return [collectionView dequeueReusableSupplementaryViewOfKind:kind withReuseIdentifier:_CPPlaceholderSupplementaryView forIndexPath:indexPath];
-}
 
 #pragma mark - Getter
 
